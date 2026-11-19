@@ -1,29 +1,25 @@
 package com.sirtowliee.vengeguard;
 
-import com.google.inject.Provides;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.IconID;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.events.MenuEntryAdded;
-import net.runelite.api.vars.Varbits;
-import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
+import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
-import net.runelite.client.party.PartyDataService;
-import net.runelite.client.party.PartyDataType;
-import net.runelite.client.party.messages.PartyData;
-import net.runelite.client.events.PartyChanged;
+import net.runelite.client.plugins.party.PartyPlugin;
+import net.runelite.client.plugins.party.PartyPluginService;
 import net.runelite.client.util.Text;
 
+@PluginDependency(PartyPlugin.class)
 @PluginDescriptor(
     name = "VengeGuard",
-    description = "Hides Cast Vengeance Other when the target cannot or should not receive it.",
+    description = "Hides Cast Vengeance Other on Ironman players and party members with Vengeance active.",
     tags = {"vengeance", "magic", "party", "ironman"}
 )
 public class VengeGuardPlugin extends Plugin
@@ -46,38 +42,7 @@ public class VengeGuardPlugin extends Plugin
     private PartyService partyService;
 
     @Inject
-    private PartyDataService partyDataService;
-
-    private final Map<Long, Boolean> vengeanceByMemberId = new ConcurrentHashMap<>();
-
-    @Override
-    protected void startUp()
-    {
-        partyDataService.subscribe(this, PartyDataType.VENGEANCE);
-    }
-
-    @Override
-    protected void shutDown()
-    {
-        partyDataService.unsubscribe(this, PartyDataType.VENGEANCE);
-        vengeanceByMemberId.clear();
-    }
-
-    @Subscribe
-    public void onPartyData(PartyData data)
-    {
-        Boolean vengeanceActive = data.getVengeanceActive();
-        if (vengeanceActive != null)
-        {
-            vengeanceByMemberId.put(data.getMemberId(), vengeanceActive);
-        }
-    }
-
-    @Subscribe
-    public void onPartyChanged(PartyChanged event)
-    {
-        vengeanceByMemberId.clear();
-    }
+    private PartyPluginService partyPluginService;
 
     @Subscribe
     public void onMenuEntryAdded(MenuEntryAdded event)
@@ -87,6 +52,7 @@ public class VengeGuardPlugin extends Plugin
             return;
         }
 
+        // The menu target contains the Jagex chat-icon markup for Ironman account types.
         if (isIronmanTarget(event.getTarget()))
         {
             removeEntry(event.getMenuEntry());
@@ -100,15 +66,16 @@ public class VengeGuardPlugin extends Plugin
         }
 
         String targetName = Text.removeTags(Text.toJagexName(target.getName()));
-        net.runelite.client.party.PartyMember member =
-            partyService.getMemberByDisplayName(targetName);
-
+        PartyMember member = partyService.getMemberByDisplayName(targetName);
         if (member == null)
         {
             return;
         }
 
-        if (Boolean.TRUE.equals(vengeanceByMemberId.get(member.getMemberId())))
+        net.runelite.client.plugins.party.data.PartyMemberData partyData =
+            partyPluginService.getPartyData(member.getMemberId());
+
+        if (partyData != null && partyData.isVengeanceActive())
         {
             removeEntry(event.getMenuEntry());
         }
@@ -138,11 +105,5 @@ public class VengeGuardPlugin extends Plugin
         {
             client.getMenu().removeMenuEntry(entry);
         }
-    }
-
-    @Provides
-    VengeGuardConfig provideConfig(ConfigManager configManager)
-    {
-        return configManager.getConfig(VengeGuardConfig.class);
     }
 }
