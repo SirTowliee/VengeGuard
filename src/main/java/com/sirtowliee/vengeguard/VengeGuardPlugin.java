@@ -2,6 +2,7 @@ package com.sirtowliee.vengeguard;
 
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.IconID;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
@@ -18,12 +19,21 @@ import net.runelite.client.util.Text;
 @PluginDependency(PartyPlugin.class)
 @PluginDescriptor(
     name = "VengeGuard",
-    description = "Hides the Vengeance Other cast option for party members who already have Vengeance active.",
-    tags = {"vengeance", "magic", "party"}
+    description = "Hides the Vengeance Other cast option for Ironman players and party members who already have Vengeance active.",
+    tags = {"vengeance", "magic", "party", "ironman"}
 )
 public class VengeGuardPlugin extends Plugin
 {
     private static final String VENGEANCE_OTHER = "Vengeance Other";
+
+    private static final IconID[] IRONMAN_ICONS = {
+        IconID.IRONMAN,
+        IconID.ULTIMATE_IRONMAN,
+        IconID.HARDCORE_IRONMAN,
+        IconID.GROUP_IRONMAN,
+        IconID.HARDCORE_GROUP_IRONMAN,
+        IconID.UNRANKED_GROUP_IRONMAN
+    };
 
     @Inject
     private Client client;
@@ -36,17 +46,25 @@ public class VengeGuardPlugin extends Plugin
     {
         MenuEntry entry = event.getMenuEntry();
 
-        // When a spell is selected, the menu option is normally "Cast";
-        // the spell name is part of the target (for example, "Vengeance Other -> player").
-        if (entry == null
-            || entry.getType() != MenuAction.WIDGET_TARGET_ON_PLAYER
-            || !isVengeanceOtherEntry(event))
+        if (entry == null || !isVengeanceOtherEntry(event))
+        {
+            return;
+        }
+
+        // RuneLite includes account-type icons in the player target as Jagex image tags.
+        if (isIronmanTarget(event.getTarget()))
+        {
+            client.getMenu().removeMenuEntry(entry);
+            return;
+        }
+
+        if (entry.getType() != MenuAction.WIDGET_TARGET_ON_PLAYER)
         {
             return;
         }
 
         Player target = entry.getPlayer();
-        if (target == null || !partyService.isInParty() || target.getName() == null)
+        if (target == null || target.getName() == null || !partyService.isInParty())
         {
             return;
         }
@@ -64,6 +82,25 @@ public class VengeGuardPlugin extends Plugin
             String.valueOf(event.getOption()) + " " + String.valueOf(event.getTarget())
         );
 
-        return optionAndTarget.toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER.toLowerCase(java.util.Locale.ROOT));
+        return optionAndTarget.toLowerCase(java.util.Locale.ROOT)
+            .contains(VENGEANCE_OTHER.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    private boolean isIronmanTarget(String menuTarget)
+    {
+        if (menuTarget == null || menuTarget.isEmpty())
+        {
+            return false;
+        }
+
+        for (IconID icon : IRONMAN_ICONS)
+        {
+            if (menuTarget.contains(icon.toString()))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
