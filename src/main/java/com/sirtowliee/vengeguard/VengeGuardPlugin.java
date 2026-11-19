@@ -7,13 +7,12 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.party.PartyMember;
+import net.runelite.client.party.PartyService;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.party.PartyMember;
-import net.runelite.client.party.PartyService;
 import net.runelite.client.plugins.party.PartyPlugin;
-import net.runelite.client.plugins.party.PartyPluginService;
 import net.runelite.client.util.Text;
 
 @PluginDependency(PartyPlugin.class)
@@ -41,9 +40,6 @@ public class VengeGuardPlugin extends Plugin
     @Inject
     private PartyService partyService;
 
-    @Inject
-    private PartyPluginService partyPluginService;
-
     @Subscribe
     public void onMenuEntryAdded(MenuEntryAdded event)
     {
@@ -52,7 +48,7 @@ public class VengeGuardPlugin extends Plugin
             return;
         }
 
-        // The menu target contains the Jagex chat-icon markup for Ironman account types.
+        // Ironman account icons are included in the menu target as Jagex image tags.
         if (isIronmanTarget(event.getTarget()))
         {
             removeEntry(event.getMenuEntry());
@@ -67,15 +63,7 @@ public class VengeGuardPlugin extends Plugin
 
         String targetName = Text.removeTags(Text.toJagexName(target.getName()));
         PartyMember member = partyService.getMemberByDisplayName(targetName);
-        if (member == null)
-        {
-            return;
-        }
-
-        net.runelite.client.plugins.party.data.PartyMemberData partyData =
-            partyPluginService.getPartyData(member.getMemberId());
-
-        if (partyData != null && partyData.isVengeanceActive())
+        if (member != null && member.isVengeanceActive())
         {
             removeEntry(event.getMenuEntry());
         }
