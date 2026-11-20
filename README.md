@@ -1,18 +1,35 @@
 # VengeGuard
 
-VengeGuard is a RuneLite plugin that removes the **Cast Vengeance Other** player-menu option in two situations:
+VengeGuard improves the **Cast Vengeance Other** player-menu order and includes an optional removal test.
 
-- The target's player-menu name contains a RuneLite/Jagex Ironman account icon (Ironman, Ultimate Ironman, Hardcore Ironman, Group Ironman, Hardcore Group Ironman, or Unranked Group Ironman).
-- The target is a member of your built-in RuneLite Party and RuneLite has reported that their Vengeance effect is active.
+## Target priority
 
-The option is left alone for other players.
+When multiple **Cast Vengeance Other** entries are present, VengeGuard orders them so the top of the menu prioritises:
+
+1. Party members who do not currently have Vengeance active.
+2. Players who are not in your RuneLite Party.
+3. Party members who already have Vengeance active.
+4. Ironman account types (Ironman, Ultimate Ironman, Hardcore Ironman, Group Ironman, Hardcore Group Ironman, and Unranked Group Ironman).
+
+Only Vengeance Other entries are reordered; other menu entries are left in place.
+
+## Optional removal test
+
+Open VengeGuard's configuration to enable **Test menu removal**. When enabled, VengeGuard attempts to remove Vengeance Other entries for party members with active Vengeance and Ironman accounts instead of leaving them at the bottom.
+
+This is a test setting and should be validated in-game before relying on it.
 
 ## Party requirement
 
-Enable RuneLite's built-in **Party** plugin and be in the same party as the other player for VengeGuard to use their shared Vengeance status. The Party plugin must be able to share the Vengeance data type.
+Enable RuneLite's built-in **Party** plugin and be in the same party as other players for VengeGuard to use their shared Vengeance status. The Party plugin must be able to share the Vengeance data type.
+
+## Debugging
+
+**Debug logging** is enabled by default. It logs detected Vengeance Other entries, their classifications, and whether the removal test is enabled. These messages can help diagnose menu detection and ordering issues.
 
 ## Important notes
 
 - VengeGuard only changes the local right-click menu; it does not cast spells or interact with the game automatically.
-- Ironman detection relies on the account-type icon being present in the target text supplied by RuneLite for that player-menu entry.
+- Ironman detection relies on the account-type icon being present in the target text supplied by RuneLite for that menu entry.
 - Party Vengeance status is only available for players in your current RuneLite Party and may be briefly stale between status updates.
+- A successful build confirms that the code compiles; actual menu behaviour still requires in-game testing.
