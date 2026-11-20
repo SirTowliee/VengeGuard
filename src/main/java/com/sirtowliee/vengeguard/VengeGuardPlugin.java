@@ -7,11 +7,12 @@ import java.util.List;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.IconID;
+import net.runelite.api.Menu;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.events.MenuEntryAdded;
-import net.runelite.api.events.MenuOpened;
+import net.runelite.api.events.PostMenuSort;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
@@ -75,9 +76,17 @@ public class VengeGuardPlugin extends Plugin
     }
 
     @Subscribe
-    public void onMenuOpened(MenuOpened event)
+    public void onPostMenuSort(PostMenuSort event)
     {
-        MenuEntry[] originalEntries = event.getMenuEntries();
+        // Follow Menu Entry Swapper's approach: modify the completed menu after RuneLite's
+        // normal sorting, but before it is displayed. Do not modify an already-open menu.
+        if (client.isMenuOpen())
+        {
+            return;
+        }
+
+        Menu menu = client.getMenu();
+        MenuEntry[] originalEntries = menu.getMenuEntries();
         if (originalEntries == null || originalEntries.length == 0)
         {
             return;
@@ -85,62 +94,62 @@ public class VengeGuardPlugin extends Plugin
 
         List<MenuEntry> vengeanceEntries = new ArrayList<>();
         List<Integer> vengeanceIndexes = new ArrayList<>();
+        List<MenuEntry> keptEntries = new ArrayList<>();
 
         for (int i = 0; i < originalEntries.length; i++)
         {
             MenuEntry entry = originalEntries[i];
-            if (entry != null && isVengeanceOtherEntry(entry.getOption(), entry.getTarget()))
+            if (entry == null || !isVengeanceOtherEntry(entry.getOption(), entry.getTarget()))
             {
-                int priority = getPriority(entry);
-                String playerName = entry.getPlayer() == null ? "unknown" : entry.getPlayer().getName();
+                keptEntries.add(entry);
+                continue;
+            }
 
+            int priority = getPriority(entry);
+            String playerName = entry.getPlayer() == null ? "unknown" : entry.getPlayer().getName();
+
+            if (config.debugLogging())
+            {
+                log.info("VengeGuard menu classification: player='{}', priority={}, category={}",
+                    playerName, priority, priorityName(priority));
+            }
+
+            if (config.testMenuRemoval()
+                && (priority == PRIORITY_VENGED_PARTY || priority == PRIORITY_IRONMAN))
+            {
                 if (config.debugLogging())
                 {
-                    log.info("VengeGuard menu classification: player='{}', priority={}, category={}",
-                        playerName, priority, priorityName(priority));
+                    log.info("VengeGuard removal test: removing '{}' ({}).", playerName, priorityName(priority));
                 }
-
-                if (config.testMenuRemoval()
-                    && (priority == PRIORITY_VENGED_PARTY || priority == PRIORITY_IRONMAN))
-                {
-                    if (config.debugLogging())
-                    {
-                        log.info("VengeGuard removal test: removing '{}' ({}).", playerName, priorityName(priority));
-                    }
-                    continue;
-                }
-
-                vengeanceEntries.add(entry);
-                vengeanceIndexes.add(i);
+                continue;
             }
+
+            vengeanceEntries.add(entry);
+            vengeanceIndexes.add(keptEntries.size());
+            keptEntries.add(entry);
         }
 
         if (vengeanceEntries.isEmpty())
         {
-            if (config.debugLogging() && config.testMenuRemoval())
+            if (config.testMenuRemoval() && config.debugLogging())
             {
                 log.info("VengeGuard removal test: no eligible Vengeance Other entries were present.");
             }
-            if (config.testMenuRemoval())
+            if (keptEntries.size() != originalEntries.length)
             {
-                event.setMenuEntries(removeBlockedEntries(originalEntries));
+                menu.setMenuEntries(keptEntries.toArray(new MenuEntry[0]));
             }
             return;
         }
 
-        // MenuOpened arrays are ordered bottom-to-top: the last entry is displayed at the top.
-        // Sorting priority descending therefore places the highest-priority targets at the top.
+        // Menu arrays are reversed: the final element is displayed at the top.
+        // Descending priority puts priority 0 (unvenged party) at the top.
         vengeanceEntries.sort(Comparator.comparingInt(this::getPriority).reversed());
 
-        MenuEntry[] reorderedEntries = originalEntries.clone();
+        MenuEntry[] reorderedEntries = keptEntries.toArray(new MenuEntry[0]);
         for (int i = 0; i < vengeanceIndexes.size(); i++)
         {
             reorderedEntries[vengeanceIndexes.get(i)] = vengeanceEntries.get(i);
-        }
-
-        if (config.testMenuRemoval())
-        {
-            reorderedEntries = removeBlockedEntries(reorderedEntries);
         }
 
         if (config.debugLogging())
@@ -149,16 +158,7 @@ public class VengeGuardPlugin extends Plugin
                 vengeanceEntries.size(), config.testMenuRemoval() ? "ON" : "OFF");
         }
 
-        event.setMenuEntries(reorderedEntries);
-    }
-
-    private MenuEntry[] removeBlockedEntries(MenuEntry[] entries)
-    {
-        return Arrays.stream(entries)
-            .filter(entry -> entry == null
-                || !isVengeanceOtherEntry(entry.getOption(), entry.getTarget())
-                || (getPriority(entry) != PRIORITY_VENGED_PARTY && getPriority(entry) != PRIORITY_IRONMAN))
-            .toArray(MenuEntry[]::new);
+        menu.setMenuEntries(reorderedEntries);
     }
 
     private int getPriority(MenuEntry entry)
