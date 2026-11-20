@@ -1,12 +1,17 @@
 package com.sirtowliee.vengeguard;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.IconID;
+import net.runelite.api.Menu;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
-import net.runelite.api.events.MenuEntryAdded;
+import net.runelite.api.events.PostMenuSort;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
@@ -19,12 +24,12 @@ import net.runelite.client.util.Text;
 @PluginDependency(PartyPlugin.class)
 @PluginDescriptor(
     name = "VengeGuard",
-    description = "Hides the Vengeance Other cast option for Ironman players and party members who already have Vengeance active.",
+    description = "Prioritises Vengeance Other targets by party status, active Vengeance and Ironman status.",
     tags = {"vengeance", "magic", "party", "ironman"}
 )
 public class VengeGuardPlugin extends Plugin
 {
-    private static final String VENGEANCE_OTHER = "Vengeance Other";
+    private static final String VENGEANCE_OTHER = "vengeance other";
 
     private static final IconID[] IRONMAN_ICONS = {
         IconID.IRONMAN,
@@ -42,48 +47,78 @@ public class VengeGuardPlugin extends Plugin
     private PartyService partyService;
 
     @Subscribe
-    public void onMenuEntryAdded(MenuEntryAdded event)
+    public void onPostMenuSort(PostMenuSort event)
     {
-        MenuEntry entry = event.getMenuEntry();
-
-        if (entry == null || !isVengeanceOtherEntry(event))
+        if (client.isMenuOpen())
         {
             return;
         }
 
-        // RuneLite includes account-type icons in the player target as Jagex image tags.
-        if (isIronmanTarget(event.getTarget()))
+        Menu menu = client.getMenu();
+        MenuEntry[] entries = menu.getMenuEntries();
+        List<Integer> vengeanceIndexes = new ArrayList<>();
+        List<MenuEntry> vengeanceEntries = new ArrayList<>();
+
+        for (int i = 0; i < entries.length; i++)
         {
-            client.getMenu().removeMenuEntry(entry);
+            MenuEntry entry = entries[i];
+            if (isVengeanceOtherEntry(entry))
+            {
+                vengeanceIndexes.add(i);
+                vengeanceEntries.add(entry);
+            }
+        }
+
+        if (vengeanceEntries.size() < 2)
+        {
             return;
         }
 
-        if (entry.getType() != MenuAction.WIDGET_TARGET_ON_PLAYER)
+        // Menu arrays are ordered bottom-to-top, so ascending priority puts
+        // the highest-priority entries at the top of the visible menu.
+        vengeanceEntries.sort(Comparator.comparingInt(this::getPriority));
+
+        for (int i = 0; i < vengeanceIndexes.size(); i++)
         {
-            return;
+            entries[vengeanceIndexes.get(i)] = vengeanceEntries.get(i);
+        }
+
+        menu.setMenuEntries(entries);
+    }
+
+    private boolean isVengeanceOtherEntry(MenuEntry entry)
+    {
+        if (entry == null || entry.getType() != MenuAction.WIDGET_TARGET_ON_PLAYER)
+        {
+            return false;
+        }
+
+        String option = Text.removeTags(String.valueOf(entry.getOption()));
+        return option.toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER);
+    }
+
+    private int getPriority(MenuEntry entry)
+    {
+        // 3 = Ironman (bottom), 2 = venged party member,
+        // 1 = unvenged non-party player, 0 = unvenged party member (top).
+        if (isIronmanTarget(entry.getTarget()))
+        {
+            return 3;
         }
 
         Player target = entry.getPlayer();
         if (target == null || target.getName() == null || !partyService.isInParty())
         {
-            return;
+            return 1;
         }
 
         PartyMember member = partyService.getMemberByDisplayName(target.getName());
-        if (member != null && member.isVengeanceActive())
+        if (member == null)
         {
-            client.getMenu().removeMenuEntry(entry);
+            return 1;
         }
-    }
 
-    private boolean isVengeanceOtherEntry(MenuEntryAdded event)
-    {
-        String optionAndTarget = Text.removeTags(
-            String.valueOf(event.getOption()) + " " + String.valueOf(event.getTarget())
-        );
-
-        return optionAndTarget.toLowerCase(java.util.Locale.ROOT)
-            .contains(VENGEANCE_OTHER.toLowerCase(java.util.Locale.ROOT));
+        return member.isVengeanceActive() ? 2 : 0;
     }
 
     private boolean isIronmanTarget(String menuTarget)
@@ -93,14 +128,6 @@ public class VengeGuardPlugin extends Plugin
             return false;
         }
 
-        for (IconID icon : IRONMAN_ICONS)
-        {
-            if (menuTarget.contains(icon.toString()))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return Arrays.stream(IRONMAN_ICONS).anyMatch(icon -> menuTarget.contains(icon.toString()));
     }
 }
