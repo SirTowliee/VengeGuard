@@ -1,10 +1,10 @@
 package com.sirtowliee.vengeguard;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import javax.inject.Inject;
+import com.google.inject.Provides;
 import net.runelite.api.Client;
 import net.runelite.api.IconID;
 import net.runelite.api.Menu;
@@ -13,6 +13,7 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.PostMenuSort;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
@@ -58,6 +59,12 @@ public class VengeGuardPlugin extends Plugin
 
     @Inject
     private VengeGuardConfig config;
+
+    @Provides
+    VengeGuardConfig provideConfig(ConfigManager configManager)
+    {
+        return configManager.getConfig(VengeGuardConfig.class);
+    }
 
     @Subscribe
     public void onMenuEntryAdded(MenuEntryAdded event)
