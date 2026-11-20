@@ -5,13 +5,16 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import javax.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.IconID;
 import net.runelite.api.Menu;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
+import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.PostMenuSort;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
@@ -27,6 +30,7 @@ import net.runelite.client.util.Text;
     description = "Prioritises Vengeance Other targets by party status, active Vengeance and Ironman status.",
     tags = {"vengeance", "magic", "party", "ironman"}
 )
+@Slf4j
 public class VengeGuardPlugin extends Plugin
 {
     private static final String VENGEANCE_OTHER = "vengeance other";
@@ -45,6 +49,31 @@ public class VengeGuardPlugin extends Plugin
 
     @Inject
     private PartyService partyService;
+
+    @Inject
+    private VengeGuardConfig config;
+
+    @Subscribe
+    public void onMenuEntryAdded(MenuEntryAdded event)
+    {
+        if (!config.debugLogging())
+        {
+            return;
+        }
+
+        String option = clean(event.getOption());
+        if (option.toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER))
+        {
+            MenuEntry entry = event.getMenuEntry();
+            log.info("VengeGuard detected menu entry: option='{}', target='{}', type='{}', identifier={}, param0={}, param1={}, player='{}'",
+                event.getOption(), event.getTarget(),
+                entry == null ? null : entry.getType(),
+                entry == null ? -1 : entry.getIdentifier(),
+                entry == null ? -1 : entry.getParam0(),
+                entry == null ? -1 : entry.getParam1(),
+                entry == null || entry.getPlayer() == null ? null : entry.getPlayer().getName());
+        }
+    }
 
     @Subscribe
     public void onPostMenuSort(PostMenuSort event)
@@ -67,6 +96,30 @@ public class VengeGuardPlugin extends Plugin
                 vengeanceIndexes.add(i);
                 vengeanceEntries.add(entry);
             }
+        }
+
+        if (config.debugLogging() && !vengeanceEntries.isEmpty())
+        {
+            log.info("VengeGuard menu sort: found {} Vengeance Other entries; partyActive={}, removalTest={}",
+                vengeanceEntries.size(), partyService.isInParty(), config.testRemoval());
+        }
+
+        if (config.testRemoval())
+        {
+            if (!vengeanceEntries.isEmpty())
+            {
+                MenuEntry[] filtered = Arrays.stream(entries)
+                    .filter(entry -> !isVengeanceOtherEntry(entry))
+                    .toArray(MenuEntry[]::new);
+                menu.setMenuEntries(filtered);
+
+                if (config.debugLogging())
+                {
+                    log.info("VengeGuard removal test: removed {} of {} Vengeance Other entries; {} menu entries remain.",
+                        vengeanceEntries.size(), entries.length, filtered.length);
+                }
+            }
+            return;
         }
 
         if (vengeanceEntries.size() < 2)
@@ -93,8 +146,7 @@ public class VengeGuardPlugin extends Plugin
             return false;
         }
 
-        String option = Text.removeTags(String.valueOf(entry.getOption()));
-        return option.toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER);
+        return clean(entry.getOption()).toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER);
     }
 
     private int getPriority(MenuEntry entry)
@@ -129,5 +181,10 @@ public class VengeGuardPlugin extends Plugin
         }
 
         return Arrays.stream(IRONMAN_ICONS).anyMatch(icon -> menuTarget.contains(icon.toString()));
+    }
+
+    private String clean(String value)
+    {
+        return Text.removeTags(String.valueOf(value));
     }
 }
