@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import javax.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
+import java.util.logging.Logger;
 import net.runelite.api.Client;
 import net.runelite.api.IconID;
 import net.runelite.api.Menu;
@@ -29,9 +29,9 @@ import net.runelite.client.util.Text;
     description = "Prioritises Vengeance Other targets by party status, active Vengeance and Ironman status.",
     tags = {"vengeance", "magic", "party", "ironman"}
 )
-@Slf4j
 public class VengeGuardPlugin extends Plugin
 {
+    private static final Logger LOGGER = Logger.getLogger(VengeGuardPlugin.class.getName());
     private static final String VENGEANCE_OTHER = "vengeance other";
 
     private static final IconID[] IRONMAN_ICONS = {
@@ -64,13 +64,13 @@ public class VengeGuardPlugin extends Plugin
         if (option.toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER))
         {
             MenuEntry entry = event.getMenuEntry();
-            log.info("VengeGuard detected menu entry: option='{}', target='{}', type='{}', identifier={}, param0={}, param1={}, player='{}'",
+            LOGGER.info(String.format("VengeGuard detected menu entry: option='%s', target='%s', type='%s', identifier=%d, param0=%d, param1=%d, player='%s'",
                 event.getOption(), event.getTarget(),
                 entry == null ? null : entry.getType(),
                 entry == null ? -1 : entry.getIdentifier(),
                 entry == null ? -1 : entry.getParam0(),
                 entry == null ? -1 : entry.getParam1(),
-                entry == null || entry.getPlayer() == null ? null : entry.getPlayer().getName());
+                entry == null || entry.getPlayer() == null ? null : entry.getPlayer().getName()));
         }
     }
 
@@ -99,8 +99,8 @@ public class VengeGuardPlugin extends Plugin
 
         if (config.debugLogging() && !vengeanceEntries.isEmpty())
         {
-            log.info("VengeGuard menu sort: found {} Vengeance Other entries; partyActive={}, removalTest={}",
-                vengeanceEntries.size(), partyService.isInParty(), config.testRemoval());
+            LOGGER.info(String.format("VengeGuard menu sort: found %d Vengeance Other entries; partyActive=%s, removalTest=%s",
+                vengeanceEntries.size(), partyService.isInParty(), config.testRemoval()));
         }
 
         if (config.testRemoval())
@@ -114,8 +114,8 @@ public class VengeGuardPlugin extends Plugin
 
                 if (config.debugLogging())
                 {
-                    log.info("VengeGuard removal test: removed {} of {} Vengeance Other entries; {} menu entries remain.",
-                        vengeanceEntries.size(), entries.length, filtered.length);
+                    LOGGER.info(String.format("VengeGuard removal test: removed %d of %d Vengeance Other entries; %d menu entries remain.",
+                        vengeanceEntries.size(), entries.length, filtered.length));
                 }
             }
             return;
