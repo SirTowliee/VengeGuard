@@ -14,7 +14,6 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.PostMenuSort;
-import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
@@ -91,7 +90,7 @@ public class VengeGuardPlugin extends Plugin
         for (int i = 0; i < entries.length; i++)
         {
             MenuEntry entry = entries[i];
-            if (isVengeanceOtherEntry(entry))
+            if (isPlayerVengeanceOtherEntry(entry))
             {
                 vengeanceIndexes.add(i);
                 vengeanceEntries.add(entry);
@@ -109,7 +108,7 @@ public class VengeGuardPlugin extends Plugin
             if (!vengeanceEntries.isEmpty())
             {
                 MenuEntry[] filtered = Arrays.stream(entries)
-                    .filter(entry -> !isVengeanceOtherEntry(entry))
+                    .filter(entry -> !isVengeanceOtherOption(entry))
                     .toArray(MenuEntry[]::new);
                 menu.setMenuEntries(filtered);
 
@@ -139,14 +138,15 @@ public class VengeGuardPlugin extends Plugin
         menu.setMenuEntries(entries);
     }
 
-    private boolean isVengeanceOtherEntry(MenuEntry entry)
+    private boolean isVengeanceOtherOption(MenuEntry entry)
     {
-        if (entry == null || entry.getType() != MenuAction.WIDGET_TARGET_ON_PLAYER)
-        {
-            return false;
-        }
+        return entry != null
+            && clean(entry.getOption()).toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER);
+    }
 
-        return clean(entry.getOption()).toLowerCase(java.util.Locale.ROOT).contains(VENGEANCE_OTHER);
+    private boolean isPlayerVengeanceOtherEntry(MenuEntry entry)
+    {
+        return isVengeanceOtherOption(entry) && entry.getType() == MenuAction.WIDGET_TARGET_ON_PLAYER;
     }
 
     private int getPriority(MenuEntry entry)
