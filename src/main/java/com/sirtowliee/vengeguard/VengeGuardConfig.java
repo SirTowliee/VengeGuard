@@ -26,4 +26,14 @@ public interface VengeGuardConfig extends Config
     {
         return false;
     }
+
+    @ConfigItem(
+        keyName = "showUnvengedOverlay",
+        name = "Show unvenged party overlay",
+        description = "Display party members who do not currently have Vengeance active on the game screen."
+    )
+    default boolean showUnvengedOverlay()
+    {
+        return true;
+    }
 }
