@@ -21,6 +21,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.party.PartyPlugin;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +29,7 @@ import org.slf4j.LoggerFactory;
 @PluginDependency(PartyPlugin.class)
 @PluginDescriptor(
     name = "VengeGuard",
-    description = "Prioritises Vengeance Other targets and can test hiding unavailable targets.",
+    description = "Prioritises Vengeance Other targets and tracks unvenged party members.",
     tags = {"vengeance", "magic", "party", "ironman"},
     configName = "vengeguard"
 )
@@ -59,6 +60,24 @@ public class VengeGuardPlugin extends Plugin
 
     @Inject
     private VengeGuardConfig config;
+
+    @Inject
+    private OverlayManager overlayManager;
+
+    @Inject
+    private VengeGuardOverlay vengeGuardOverlay;
+
+    @Override
+    protected void startUp()
+    {
+        overlayManager.add(vengeGuardOverlay);
+    }
+
+    @Override
+    protected void shutDown()
+    {
+        overlayManager.remove(vengeGuardOverlay);
+    }
 
     @Provides
     VengeGuardConfig provideConfig(ConfigManager configManager)
